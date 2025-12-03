@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Telegram Bot - записывает ТОЛЬКО подписанных пользователей в Google Sheets
+Telegram Bot - записывает пользователей в Google Sheets и отправляет промокод
 """
 
 import logging
@@ -26,12 +26,12 @@ CREDENTIALS_FILE = 'credentials.json'
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 # =====================================
 
-logger.info("=" * 60)
+logger.info("=" * 70)
 logger.info("🚀 БОТ ЗАПУСКАЕТСЯ")
-logger.info(f"📌 BOT_TOKEN: {BOT_TOKEN[:25]}...")
+logger.info(f"📌 GOOGLE_SHEETS_ID: {GOOGLE_SHEETS_ID}")
 logger.info(f"📌 CHANNEL_ID: {CHANNEL_ID}")
-logger.info(f"📌 GOOGLE_SHEETS_ID: {GOOGLE_SHEETS_ID[:30]}...")
-logger.info("=" * 60)
+logger.info(f"📌 PROMO_POST_ID: {PROMO_POST_ID}")
+logger.info("=" * 70)
 
 added_users = set()
 
@@ -39,18 +39,14 @@ added_users = set()
 def get_gspread_client():
     """Подключение к Google Sheets"""
     try:
-        logger.info(f"🔑 Загружаю credentials из: {CREDENTIALS_FILE}")
+        logger.info(f"🔑 Загружаю credentials...")
         creds = ServiceAccountCredentials.from_json_keyfile_name(
             CREDENTIALS_FILE, SCOPES)
-        logger.info("✅ Credentials загружены успешно!")
         
         client = gspread.authorize(creds)
-        logger.info("✅ Google Sheets client авторизован!")
+        logger.info("✅ Google Sheets подключен!")
         return client
         
-    except FileNotFoundError:
-        logger.error(f"❌ ФАЙЛ НЕ НАЙДЕН: {CREDENTIALS_FILE}")
-        return None
     except Exception as e:
         logger.error(f"❌ ОШИБКА подключения: {e}")
         import traceback
@@ -62,66 +58,43 @@ def log_subscriber(user_id: int, username: str = None):
     """Добавляем пользователя в Google Sheets"""
     try:
         if user_id in added_users:
-            logger.info(f"⏭️ User {user_id} уже добавлен, пропускаю")
+            logger.info(f"⏭️ User {user_id} уже в кэше")
             return True
 
-        logger.info(f"\n📝 ДОБАВЛЯЮ ПОЛЬЗОВАТЕЛЯ: {user_id} (@{username})")
+        logger.info(f"\n{'='*70}")
+        logger.info(f"📝 ЗАПИСЫВАЮ В ТАБЛИЦУ: {user_id} (@{username})")
+        logger.info(f"{'='*70}")
 
         client = get_gspread_client()
         if not client:
-            logger.error("❌ Google Sheets client is None!")
+            logger.error("❌ Нет подключения к Google Sheets!")
             return False
 
-        logger.info(f"📂 Открываю таблицу...")
+        logger.info(f"📂 Открываю таблицу {GOOGLE_SHEETS_ID}...")
         spreadsheet = client.open_by_key(GOOGLE_SHEETS_ID)
-        logger.info(f"✅ Таблица открыта: {spreadsheet.title}")
+        logger.info(f"✅ Таблица: {spreadsheet.title}")
         
         worksheet = spreadsheet.sheet1
-        logger.info(f"✅ Лист открыт: {worksheet.title}")
+        logger.info(f"✅ Лист: {worksheet.title}")
 
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         username_str = f"@{username}" if username else f"User_{user_id}"
 
         row_data = [str(user_id), username_str, timestamp, 'subscribed']
-        logger.info(f"📥 Добавляю строку: {row_data}")
+        logger.info(f"📥 Добавляю: {row_data}")
         
         worksheet.append_row(row_data)
-        logger.info(f"✅ Строка добавлена!")
 
         added_users.add(user_id)
 
-        logger.info(f"🎉 УСПЕХ! Пользователь {user_id} (@{username}) добавлен в таблицу!\n")
+        logger.info(f"🎉🎉🎉 УСПЕХ! Добавлен в таблицу!")
+        logger.info(f"{'='*70}\n")
         return True
 
     except Exception as e:
-        logger.error(f"❌ ОШИБКА при добавлении: {e}")
+        logger.error(f"❌ ОШИБКА: {e}")
         import traceback
         logger.error(traceback.format_exc())
-        return False
-
-
-async def check_subscription(context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    """
-    ПРОВЕРЯЕМ: подписан ли пользователь на канал
-    Возвращает: True/False
-    """
-    try:
-        logger.info(f"🔍 Проверяю подписку пользователя {user_id} на канал {CHANNEL_ID}")
-        
-        member = await context.bot.get_chat_member(
-            chat_id=CHANNEL_ID,
-            user_id=user_id
-        )
-        
-        is_member = member.status in ['member', 'administrator', 'creator']
-        
-        logger.info(f"   Member status: {member.status}")
-        logger.info(f"   Is member: {is_member}")
-        
-        return is_member
-        
-    except Exception as e:
-        logger.error(f"❌ ОШИБКА при проверке подписки: {e}")
         return False
 
 
@@ -131,18 +104,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "unknown"
     first_name = update.effective_user.first_name or "Friend"
 
-    logger.info(f"\n🎯 /START команда от {user_id} (@{username})")
+    logger.info(f"\n🎯 /START от {user_id} (@{username})")
 
-    # ПРОВЕРЯЕМ подписку
-    is_subscribed = await check_subscription(context, user_id)
-    
-    if is_subscribed:
-        logger.info(f"✅ User {user_id} ПОДПИСАН на канал!")
+    # СРАЗУ логируем в таблицу (без проверки подписки!)
+    logged = log_subscriber(user_id, username)
+
+    if logged:
+        # Отправляем сообщение благодарности
+        thanks_text = (
+            "🎉 <b>Спасибо что подписались на @senseandart!</b>\n\n"
+            "👇 Нажмите кнопку и получите промокод на скидку:"
+        )
         
-        # Логируем в таблицу
-        log_subscriber(user_id, username)
-
-        # Отправляем промокод
         keyboard = [
             [InlineKeyboardButton(
                 "🎁 Получить промокод на скидку",
@@ -151,45 +124,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        message_text = (
-            f"🎉 <b>Привет, {first_name}!</b>\n\n"
-            "Спасибо что подписались на <b>@senseandart</b>!\n\n"
-            "👇 Нажмите кнопку и получите <b>промокод на скидку</b>:"
-        )
-
         await update.message.reply_text(
-            message_text,
+            thanks_text,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
         
-        logger.info(f"✅ Промокод отправлен {user_id}\n")
+        logger.info(f"✅ Сообщение отправлено {user_id}")
     else:
-        logger.info(f"❌ User {user_id} НЕ ПОДПИСАН на канал!")
-        
-        # Просим подписаться
-        keyboard = [
-            [InlineKeyboardButton(
-                "📢 Подписаться на канал @senseandart",
-                url="https://t.me/senseandart"
-            )]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        message_text = (
-            f"👋 <b>Привет, {first_name}!</b>\n\n"
-            "Сначала подпишитесь на канал <b>@senseandart</b>\n\n"
-            "После подписки напишите мне еще раз, и я пришлю вам промокод! 🎁\n\n"
-            "👇 Нажмите кнопку:"
+        error_text = (
+            "❌ Ошибка при записи в таблицу.\n"
+            "Пожалуйста, попробуйте позже."
         )
-
-        await update.message.reply_text(
-            message_text,
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
-        
-        logger.info(f"❌ Просьба подписаться отправлена {user_id}\n")
+        await update.message.reply_text(error_text)
+        logger.error(f"❌ Ошибка записи для {user_id}")
 
 
 async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -200,16 +148,16 @@ async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logger.info(f"\n📨 СООБЩЕНИЕ от {user_id}: {text}")
 
-    # ПРОВЕРЯЕМ подписку
-    is_subscribed = await check_subscription(context, user_id)
-    
-    if is_subscribed:
-        logger.info(f"✅ User {user_id} ПОДПИСАН на канал!")
-        
-        # Логируем в таблицу
-        log_subscriber(user_id, username)
+    # СРАЗУ логируем в таблицу (без проверки подписки!)
+    logged = log_subscriber(user_id, username)
 
-        # Отправляем промокод
+    if logged:
+        # Отправляем сообщение благодарности
+        thanks_text = (
+            "🎉 <b>Спасибо что подписались на @senseandart!</b>\n\n"
+            "👇 Нажмите кнопку и получите промокод на скидку:"
+        )
+        
         keyboard = [
             [InlineKeyboardButton(
                 "🎁 Получить промокод на скидку",
@@ -218,43 +166,20 @@ async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        message_text = (
-            "🎉 <b>Спасибо что подписались на @senseandart!</b>\n\n"
-            "👇 Вот ваш промокод на скидку:"
-        )
-
         await update.message.reply_text(
-            message_text,
+            thanks_text,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
         
-        logger.info(f"✅ Промокод отправлен {user_id}\n")
+        logger.info(f"✅ Сообщение отправлено {user_id}")
     else:
-        logger.info(f"❌ User {user_id} НЕ ПОДПИСАН на канал!")
-        
-        # Просим подписаться
-        keyboard = [
-            [InlineKeyboardButton(
-                "📢 Подписаться на канал @senseandart",
-                url="https://t.me/senseandart"
-            )]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        message_text = (
-            "Вы еще не подписаны на канал <b>@senseandart</b>\n\n"
-            "Подпишитесь и напишите мне снова! 🎁\n\n"
-            "👇 Нажмите кнопку:"
+        error_text = (
+            "❌ Ошибка при записи в таблицу.\n"
+            "Пожалуйста, попробуйте позже."
         )
-
-        await update.message.reply_text(
-            message_text,
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
-        
-        logger.info(f"❌ Просьба подписаться отправлена {user_id}\n")
+        await update.message.reply_text(error_text)
+        logger.error(f"❌ Ошибка записи для {user_id}")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -266,9 +191,9 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Запуск бота"""
-    logger.info("\n" + "=" * 60)
+    logger.info("\n" + "=" * 70)
     logger.info("🚀🚀🚀 ЗАПУСКАЮ БОТ...")
-    logger.info("=" * 60 + "\n")
+    logger.info("=" * 70 + "\n")
 
     application = Application.builder().token(BOT_TOKEN).build()
 
@@ -278,8 +203,8 @@ def main():
     application.add_error_handler(error_handler)
 
     # Запуск
-    logger.info("✅✅✅ БОТ ГОТОВ К РАБОТЕ!")
-    logger.info("=" * 60 + "\n")
+    logger.info("✅✅✅ БОТ ГОТОВ!")
+    logger.info("=" * 70 + "\n")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
