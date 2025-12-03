@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 import gspread
+import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters, ChatMemberHandler
 from oauth2client.service_account import ServiceAccountCredentials
+
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 BOT_TOKEN = '7904726862:AAGicriNr_ElKmz6jGaW5pBCWNudiw3LvR0'
 GOOGLE_SHEETS_ID = '1mUQ8PflOvHUD2q1V7zegkgGUmvRQUG9k6P6tyZJbM44'
@@ -27,8 +31,9 @@ def log_subscriber(user_id: int, username: str):
         username_str = f"@{username}" if username else f"User_{user_id}"
         worksheet.append_row([str(user_id), username_str, timestamp, 'subscribed'])
         added_users.add(user_id)
-    except:
-        pass
+        logger.info(f"✅ Added to sheet: {user_id} (@{username})")
+    except Exception as e:
+        logger.error(f"❌ Error adding to sheet: {e}")
 
 
 async def send_promo(context: ContextTypes.DEFAULT_TYPE, user_id: int):
@@ -41,39 +46,57 @@ async def send_promo(context: ContextTypes.DEFAULT_TYPE, user_id: int):
             ]),
             parse_mode='HTML'
         )
-    except:
-        pass
+        logger.info(f"✅ Promo sent to {user_id}")
+    except Exception as e:
+        logger.error(f"❌ Error sending promo to {user_id}: {e}")
 
 
 async def track_channel_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ловит подписку на канал и сразу отправляет промокод"""
-    my_chat_member = update.my_chat_member
-    
-    # Проверяем что это наш канал
-    if my_chat_member.chat.id != CHANNEL_ID:
-        return
-    
-    # Проверяем что произошла подписка (был LEFT, стал MEMBER)
-    if my_chat_member.old_chat_member.status == ChatMember.LEFT and \
-       my_chat_member.new_chat_member.status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR]:
+    """Ловит подписку на канал"""
+    try:
+        my_chat_member = update.my_chat_member
         
+        logger.info(f"📢 Chat member update: {my_chat_member.chat.id}")
+        
+        # Проверяем что это наш канал
+        if my_chat_member.chat.id != CHANNEL_ID:
+            logger.info(f"⏭️  Ignored: Not our channel")
+            return
+        
+        old_status = my_chat_member.old_chat_member.status
+        new_status = my_chat_member.new_chat_member.status
         user_id = my_chat_member.from_user.id
         username = my_chat_member.from_user.username or "unknown"
         
-        # Добавляем в таблицу
-        log_subscriber(user_id, username)
+        logger.info(f"👤 User {user_id}: {old_status} → {new_status}")
         
-        # Отправляем промокод
-        await send_promo(context, user_id)
+        # Проверяем подписку
+        if old_status == ChatMember.LEFT and new_status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR]:
+            logger.info(f"✅ New subscriber: {user_id} (@{username})")
+            log_subscriber(user_id, username)
+            await send_promo(context, user_id)
+        elif old_status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR] and new_status == ChatMember.LEFT:
+            logger.info(f"❌ User unsubscribed: {user_id}")
+    except Exception as e:
+        logger.error(f"❌ Error in track_channel_subscription: {e}")
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "unknown"
+    log_subscriber(user_id, username)
+    await send_promo(context, user_id)
 
 
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # ГЛАВНЫЙ ОБРАБОТЧИК - ловит подписку на канал
+    # Обработчик событий подписки
     application.add_handler(ChatMemberHandler(track_channel_subscription, ChatMemberHandler.MY_CHAT_MEMBER))
+    application.add_handler(CommandHandler("start", start))
     
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Добавляем все обновления для MY_CHAT_MEMBER
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=False)
 
 
 if __name__ == '__main__':
