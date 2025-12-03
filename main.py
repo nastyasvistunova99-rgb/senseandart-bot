@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '7904726862:AAGicriNr_ElKmz6jGaW5pBCWNudiw3LvR0')
+BOT_TOKEN = '7904726862:AAGicriNr_ElKmz6jGaW5pBCWNudiw3LvR0'
 CHANNEL_ID = int(os.getenv('CHANNEL_ID', '-1003027665711'))
 GOOGLE_SHEETS_ID = os.getenv('GOOGLE_SHEETS_ID', '1mUQ8PflOvHUD2q1V7zegkgGUmvRQUG9k6P6tyZJbM44')
 SHEET_NAME = os.getenv('SHEET_NAME', 'Sheet1')
