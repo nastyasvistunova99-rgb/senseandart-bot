@@ -52,15 +52,11 @@ async def send_promo(context: ContextTypes.DEFAULT_TYPE, user_id: int):
 
 
 async def track_channel_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ловит подписку на канал"""
+    """ТОЛЬКО при подписке на канал"""
     try:
         my_chat_member = update.my_chat_member
         
-        logger.info(f"📢 Chat member update: {my_chat_member.chat.id}")
-        
-        # Проверяем что это наш канал
         if my_chat_member.chat.id != CHANNEL_ID:
-            logger.info(f"⏭️  Ignored: Not our channel")
             return
         
         old_status = my_chat_member.old_chat_member.status
@@ -68,34 +64,22 @@ async def track_channel_subscription(update: Update, context: ContextTypes.DEFAU
         user_id = my_chat_member.from_user.id
         username = my_chat_member.from_user.username or "unknown"
         
-        logger.info(f"👤 User {user_id}: {old_status} → {new_status}")
-        
-        # Проверяем подписку
+        # ТОЛЬКО если произошла подписка: был LEFT → стал MEMBER
         if old_status == ChatMember.LEFT and new_status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR]:
-            logger.info(f"✅ New subscriber: {user_id} (@{username})")
+            logger.info(f"✅ NEW SUBSCRIBER: {user_id} (@{username})")
             log_subscriber(user_id, username)
             await send_promo(context, user_id)
-        elif old_status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR] and new_status == ChatMember.LEFT:
-            logger.info(f"❌ User unsubscribed: {user_id}")
+            
     except Exception as e:
-        logger.error(f"❌ Error in track_channel_subscription: {e}")
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    username = update.effective_user.username or "unknown"
-    log_subscriber(user_id, username)
-    await send_promo(context, user_id)
+        logger.error(f"❌ Error: {e}")
 
 
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Обработчик событий подписки
+    # ТОЛЬКО обработчик подписки - БЕЗ других команд
     application.add_handler(ChatMemberHandler(track_channel_subscription, ChatMemberHandler.MY_CHAT_MEMBER))
-    application.add_handler(CommandHandler("start", start))
     
-    # Добавляем все обновления для MY_CHAT_MEMBER
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=False)
 
 
