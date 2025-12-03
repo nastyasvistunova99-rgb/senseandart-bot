@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Telegram Bot - записывает пользователей в Google Sheets
+Telegram Bot - записывает ТОЛЬКО подписанных пользователей в Google Sheets
 """
 
 import logging
@@ -31,7 +31,6 @@ logger.info("🚀 БОТ ЗАПУСКАЕТСЯ")
 logger.info(f"📌 BOT_TOKEN: {BOT_TOKEN[:25]}...")
 logger.info(f"📌 CHANNEL_ID: {CHANNEL_ID}")
 logger.info(f"📌 GOOGLE_SHEETS_ID: {GOOGLE_SHEETS_ID[:30]}...")
-logger.info(f"📌 CREDENTIALS_FILE: {CREDENTIALS_FILE}")
 logger.info("=" * 60)
 
 added_users = set()
@@ -101,39 +100,96 @@ def log_subscriber(user_id: int, username: str = None):
         return False
 
 
+async def check_subscription(context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """
+    ПРОВЕРЯЕМ: подписан ли пользователь на канал
+    Возвращает: True/False
+    """
+    try:
+        logger.info(f"🔍 Проверяю подписку пользователя {user_id} на канал {CHANNEL_ID}")
+        
+        member = await context.bot.get_chat_member(
+            chat_id=CHANNEL_ID,
+            user_id=user_id
+        )
+        
+        is_member = member.status in ['member', 'administrator', 'creator']
+        
+        logger.info(f"   Member status: {member.status}")
+        logger.info(f"   Is member: {is_member}")
+        
+        return is_member
+        
+    except Exception as e:
+        logger.error(f"❌ ОШИБКА при проверке подписки: {e}")
+        return False
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /start"""
     user_id = update.effective_user.id
     username = update.effective_user.username or "unknown"
     first_name = update.effective_user.first_name or "Friend"
 
-    logger.info(f"🎯 /START команда от {user_id} (@{username})")
+    logger.info(f"\n🎯 /START команда от {user_id} (@{username})")
 
-    # Логируем в таблицу
-    log_subscriber(user_id, username)
-
-    # Отправляем промокод
-    keyboard = [
-        [InlineKeyboardButton(
-            "🎁 Получить промокод на скидку",
-            url=f"https://t.me/senseandart/{PROMO_POST_ID}"
-        )]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    message_text = (
-        f"🎉 <b>Привет, {first_name}!</b>\n\n"
-        "Спасибо что подписались на <b>@senseandart</b>!\n\n"
-        "👇 Нажмите кнопку и получите <b>промокод на скидку</b>:"
-    )
-
-    await update.message.reply_text(
-        message_text,
-        reply_markup=reply_markup,
-        parse_mode='HTML'
-    )
+    # ПРОВЕРЯЕМ подписку
+    is_subscribed = await check_subscription(context, user_id)
     
-    logger.info(f"✅ Сообщение отправлено {user_id}\n")
+    if is_subscribed:
+        logger.info(f"✅ User {user_id} ПОДПИСАН на канал!")
+        
+        # Логируем в таблицу
+        log_subscriber(user_id, username)
+
+        # Отправляем промокод
+        keyboard = [
+            [InlineKeyboardButton(
+                "🎁 Получить промокод на скидку",
+                url=f"https://t.me/senseandart/{PROMO_POST_ID}"
+            )]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        message_text = (
+            f"🎉 <b>Привет, {first_name}!</b>\n\n"
+            "Спасибо что подписались на <b>@senseandart</b>!\n\n"
+            "👇 Нажмите кнопку и получите <b>промокод на скидку</b>:"
+        )
+
+        await update.message.reply_text(
+            message_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        
+        logger.info(f"✅ Промокод отправлен {user_id}\n")
+    else:
+        logger.info(f"❌ User {user_id} НЕ ПОДПИСАН на канал!")
+        
+        # Просим подписаться
+        keyboard = [
+            [InlineKeyboardButton(
+                "📢 Подписаться на канал @senseandart",
+                url="https://t.me/senseandart"
+            )]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        message_text = (
+            f"👋 <b>Привет, {first_name}!</b>\n\n"
+            "Сначала подпишитесь на канал <b>@senseandart</b>\n\n"
+            "После подписки напишите мне еще раз, и я пришлю вам промокод! 🎁\n\n"
+            "👇 Нажмите кнопку:"
+        )
+
+        await update.message.reply_text(
+            message_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        
+        logger.info(f"❌ Просьба подписаться отправлена {user_id}\n")
 
 
 async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -142,32 +198,63 @@ async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "unknown"
     text = update.message.text
 
-    logger.info(f"📨 СООБЩЕНИЕ от {user_id}: {text}")
+    logger.info(f"\n📨 СООБЩЕНИЕ от {user_id}: {text}")
 
-    # Логируем в таблицу
-    log_subscriber(user_id, username)
-
-    # Отправляем промокод
-    keyboard = [
-        [InlineKeyboardButton(
-            "🎁 Получить промокод на скидку",
-            url=f"https://t.me/senseandart/{PROMO_POST_ID}"
-        )]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    message_text = (
-        "🎉 <b>Спасибо что подписались на @senseandart!</b>\n\n"
-        "👇 Нажмите кнопку и получите <b>промокод на скидку</b>:"
-    )
-
-    await update.message.reply_text(
-        message_text,
-        reply_markup=reply_markup,
-        parse_mode='HTML'
-    )
+    # ПРОВЕРЯЕМ подписку
+    is_subscribed = await check_subscription(context, user_id)
     
-    logger.info(f"✅ Сообщение отправлено {user_id}\n")
+    if is_subscribed:
+        logger.info(f"✅ User {user_id} ПОДПИСАН на канал!")
+        
+        # Логируем в таблицу
+        log_subscriber(user_id, username)
+
+        # Отправляем промокод
+        keyboard = [
+            [InlineKeyboardButton(
+                "🎁 Получить промокод на скидку",
+                url=f"https://t.me/senseandart/{PROMO_POST_ID}"
+            )]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        message_text = (
+            "🎉 <b>Спасибо что подписались на @senseandart!</b>\n\n"
+            "👇 Вот ваш промокод на скидку:"
+        )
+
+        await update.message.reply_text(
+            message_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        
+        logger.info(f"✅ Промокод отправлен {user_id}\n")
+    else:
+        logger.info(f"❌ User {user_id} НЕ ПОДПИСАН на канал!")
+        
+        # Просим подписаться
+        keyboard = [
+            [InlineKeyboardButton(
+                "📢 Подписаться на канал @senseandart",
+                url="https://t.me/senseandart"
+            )]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        message_text = (
+            "Вы еще не подписаны на канал <b>@senseandart</b>\n\n"
+            "Подпишитесь и напишите мне снова! 🎁\n\n"
+            "👇 Нажмите кнопку:"
+        )
+
+        await update.message.reply_text(
+            message_text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        
+        logger.info(f"❌ Просьба подписаться отправлена {user_id}\n")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
