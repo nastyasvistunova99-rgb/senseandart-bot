@@ -9,10 +9,9 @@ import gspread
 import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, ContextTypes, ChatMemberHandler, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, ContextTypes, CommandHandler, MessageHandler, filters
 from oauth2client.service_account import ServiceAccountCredentials
 import os
-from pathlib import Path
 
 # Enable logging
 logging.basicConfig(
@@ -36,6 +35,9 @@ logger.info(f"📌 BOT_TOKEN: {BOT_TOKEN[:20]}...")
 logger.info(f"📌 CHANNEL_ID: {CHANNEL_ID}")
 logger.info(f"📌 GOOGLE_SHEETS_ID: {GOOGLE_SHEETS_ID[:20]}...")
 
+# Кэш уже добавленных пользователей (чтобы не добавлять дважды)
+added_users = set()
+
 
 def get_gspread_client():
     """Get gspread client for Google Sheets"""
@@ -43,6 +45,7 @@ def get_gspread_client():
         creds = ServiceAccountCredentials.from_json_keyfile_name(
             CREDENTIALS_FILE, SCOPES)
         client = gspread.authorize(creds)
+        logger.info("✅ Google Sheets client connected!")
         return client
     except Exception as e:
         logger.error(f"❌ Could not load Google Sheets credentials: {e}")
@@ -52,6 +55,11 @@ def get_gspread_client():
 def log_subscriber(user_id: int, username: str = None):
     """Log subscriber to Google Sheets using gspread"""
     try:
+        # Пропускаем если уже добавлен
+        if user_id in added_users:
+            logger.info(f"⚠️ User {user_id} already in cache, skipping")
+            return True
+
         client = get_gspread_client()
         if not client:
             logger.error("❌ Google Sheets client not available")
@@ -67,7 +75,10 @@ def log_subscriber(user_id: int, username: str = None):
         # Добавляем строку
         worksheet.append_row([str(user_id), username_str, timestamp, 'subscribed'])
 
-        logger.info(f"✅ Logged subscriber: {user_id} (@{username}) - ADDED TO SHEET")
+        # Добавляем в кэш
+        added_users.add(user_id)
+
+        logger.info(f"✅ ADDED TO SHEET: {user_id} (@{username})")
         return True
 
     except Exception as e:
@@ -75,88 +86,10 @@ def log_subscriber(user_id: int, username: str = None):
         return False
 
 
-def check_subscriber_in_sheet(user_id: int):
-    """Проверяем, есть ли пользователь в таблице"""
-    try:
-        client = get_gspread_client()
-        if not client:
-            logger.error("❌ Google Sheets client not available")
-            return False
-
-        spreadsheet = client.open_by_key(GOOGLE_SHEETS_ID)
-        worksheet = spreadsheet.sheet1
-
-        # Получаем все строки
-        all_rows = worksheet.get_all_values()
-
-        # Проверяем, есть ли пользователь
-        for row in all_rows:
-            if len(row) > 0 and row[0] == str(user_id):
-                logger.info(f"✅ User {user_id} found in sheet!")
-                return True
-
-        logger.warning(f"❌ User {user_id} NOT found in sheet")
-        return False
-
-    except Exception as e:
-        logger.error(f"❌ Error checking sheet: {e}")
-        return False
-
-
-async def track_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Track new channel members (subscribers)"""
-    try:
-        logger.info(f"🔔 track_chat_member called!")
-        member_update = update.chat_member
-
-        # Check if this is a subscription event
-        if member_update.new_chat_member.status == 'member':
-            if member_update.old_chat_member.status in ['left', 'restricted', None]:
-                # New subscriber
-                user_id = member_update.new_chat_member.user.id
-                username = member_update.new_chat_member.user.username
-
-                logger.info(f"✅ NEW SUBSCRIBER DETECTED: {user_id} (@{username})")
-
-                # Log to Google Sheets
-                logged = log_subscriber(user_id, username)
-
-                if not logged:
-                    logger.warning(f"❌ Failed to log subscriber {user_id}")
-                    return
-
-                logger.info(f"✅ User {user_id} successfully added to sheet!")
-
-                # Отправляем сообщение подписчику в приватный чат
-                try:
-                    keyboard = [
-                        [InlineKeyboardButton(
-                            "🎁 Получить промокод на скидку",
-                            url=f"https://t.me/senseandart/{PROMO_POST_ID}"
-                        )]
-                    ]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-
-                    await context.bot.send_message(
-                        chat_id=user_id,
-                        text="🎉 <b>Добро пожаловать!</b>\n\n"
-                             "Спасибо что подписались на <b>@senseandart</b>!\n\n"
-                             "👇 Нажмите кнопку ниже и получите <b>промокод на скидку</b>:",
-                        reply_markup=reply_markup,
-                        parse_mode='HTML'
-                    )
-                    logger.info(f"✅ Auto-message sent to {user_id}")
-                except Exception as e:
-                    logger.warning(f"⚠️ Could not send auto-message to {user_id}: {e}")
-
-    except Exception as e:
-        logger.error(f"❌ Error in track_chat_member: {e}")
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
     user_id = update.effective_user.id
-    username = update.effective_user.username
+    username = update.effective_user.username or "unknown"
 
     logger.info(f"📝 /start command from {user_id} (@{username})")
 
@@ -164,10 +97,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
         is_member = member.status in ['member', 'administrator', 'creator']
-    except:
+        logger.info(f"🔍 User {user_id} member status: {member.status}")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not check membership: {e}")
         is_member = False
 
     if is_member:
+        logger.info(f"✅ User {user_id} is MEMBER - sending promo")
+        
+        # Логируем в таблицу
+        log_subscriber(user_id, username)
+        
         # Уже подписан - отправляем промокод
         keyboard = [
             [InlineKeyboardButton(
@@ -185,6 +125,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
     else:
+        logger.info(f"❌ User {user_id} is NOT member - asking to subscribe")
+        
         # Не подписан - просим подписаться
         keyboard = [
             [InlineKeyboardButton(
@@ -197,7 +139,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "👋 <b>Добро пожаловать!</b>\n\n"
             "Подпишитесь на канал <b>@senseandart</b> и получите <b>промокод на скидку</b>!\n\n"
-            "После подписки я автоматически пришлю вам промокод 🎁\n\n"
+            "После подписки напишите что-нибудь мне и я пришлю вам промокод 🎁\n\n"
             "👇 Нажмите кнопку ниже:",
             reply_markup=reply_markup,
             parse_mode='HTML'
@@ -205,9 +147,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle any message"""
+    """Handle any message - проверяем подписку каждый раз!"""
     user_id = update.effective_user.id
-    username = update.effective_user.username
+    username = update.effective_user.username or "unknown"
 
     logger.info(f"📝 Message from {user_id} (@{username}): {update.message.text}")
 
@@ -215,10 +157,17 @@ async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
         is_member = member.status in ['member', 'administrator', 'creator']
-    except:
+        logger.info(f"🔍 User {user_id} member status: {member.status}")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not check membership: {e}")
         is_member = False
 
     if is_member:
+        logger.info(f"✅ User {user_id} is MEMBER - sending promo")
+        
+        # Логируем в таблицу
+        log_subscriber(user_id, username)
+        
         # Уже подписан - отправляем промокод
         keyboard = [
             [InlineKeyboardButton(
@@ -236,6 +185,8 @@ async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
     else:
+        logger.info(f"❌ User {user_id} is NOT member - asking to subscribe")
+        
         # Не подписан - просим подписаться
         keyboard = [
             [InlineKeyboardButton(
@@ -248,7 +199,7 @@ async def any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "👋 <b>Добро пожаловать!</b>\n\n"
             "Подпишитесь на канал <b>@senseandart</b> и получите <b>промокод на скидку</b>!\n\n"
-            "После подписки я автоматически пришлю вам промокод 🎁\n\n"
+            "После подписки напишите что-нибудь мне и я пришлю вам промокод 🎁\n\n"
             "👇 Нажмите кнопку ниже:",
             reply_markup=reply_markup,
             parse_mode='HTML'
@@ -272,10 +223,6 @@ def main():
 
     # Add any message handler
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, any_message))
-
-    # Add handlers for channel member changes
-    application.add_handler(ChatMemberHandler(track_chat_member, ChatMemberHandler.CHAT_MEMBER))
-    application.add_handler(ChatMemberHandler(track_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
 
     # Add error handler
     application.add_error_handler(error_handler)
