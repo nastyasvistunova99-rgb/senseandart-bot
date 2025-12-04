@@ -21,6 +21,10 @@ CREDENTIALS_FILE = "credentials.json"
 # Logging level
 LOG_LEVEL = "INFO"
 
-# Webhook settings
-WEBHOOK_URL = ""  # Set via environment variable
+# ✅ POLLING MODE - простой и надежный способ
+USE_POLLING = True
+POLLING_TIMEOUT = 30
+
+# Webhook settings (если нужны) - можно игнорировать при POLLING
+WEBHOOK_URL = ""
 WEBHOOK_PORT = 8080
