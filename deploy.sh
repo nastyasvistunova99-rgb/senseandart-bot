@@ -54,7 +54,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --memory 256Mi \
   --timeout 3600 \
   --no-allow-unauthenticated \
-  --set-env-vars="TELEGRAM_BOT_TOKEN=7904726862:AAGicriNr_ElKmz6jGaW5pBCWNudiw3LvR0,CHANNEL_ID=-1003027665711,GOOGLE_SHEETS_ID=1mUQ8PflOvHUD2q1V7zegkgGUmvRQUG9k6P6tyZJbM44,SHEET_NAME=Sheet1,PROMO_POST_ID=42"
+  --set-env-vars="TELEGRAM_BOT_TOKEN=7904726862:AAFG3CurCeRels3tXl_agIYYzhn6vBNlk0c,CHANNEL_ID=-1001764760145,GOOGLE_SHEETS_ID=18RwlO7h0R6FF8xOthOrIDyOvpfjP7doXcJ1fOcJu-2g,SHEET_NAME=Sheet1,PROMO_POST_ID=42"
 
 echo "✅ Deployment complete!"
 echo "Your bot is now running on Google Cloud Run."
