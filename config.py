@@ -7,7 +7,7 @@ TELEGRAM_BOT_TOKEN = "7904726862:AAFG3CurCeRels3tXl_agIYYzhn6vBNlk0c"
 CHANNEL_ID = -1001764760145
 
 # Google Sheets ID
-GOOGLE_SHEETS_ID = "1mUQ8PflOvHUD2q1V7zegkgGUmvRQUG9k6P6tyZJbM44"
+GOOGLE_SHEETS_ID = "18RwlO7h0R6FF8xOthOrIDyOvpfjP7doXcJ1fOcJu-2g"
 
 # Sheet name (tab in the spreadsheet)
 SHEET_NAME = "Sheet1"
