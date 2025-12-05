@@ -159,12 +159,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = update.effective_user.username
         logger.info(f"📝 /start от {user_id} (@{username})")
 
-        # Проверяем подписку
+        # Проверяем подписку через get_chat_member
         try:
             member = await context.bot.get_chat_member(
                 chat_id=CHANNEL_ID, user_id=user_id
             )
             status = member.status
+            logger.info(f"get_chat_member для {user_id}: {member!r}")
             is_member = status in ["member", "administrator", "creator"]
             logger.info(f"Статус пользователя в канале: {status}")
         except Exception as e:
