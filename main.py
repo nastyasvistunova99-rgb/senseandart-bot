@@ -3,10 +3,12 @@
 🤖 Простой Telegram Bot с POLLING
 ✅ Собирает подписчиков в локальную базу SQLite (subscribers.db)
 ✅ Отправляет промокод в приватный чат
+✅ По /export шлёт CSV со списком подписчиков
 """
 
 import logging
 import sqlite3
+from io import StringIO
 from pathlib import Path
 from datetime import datetime
 
@@ -79,6 +81,22 @@ def log_subscriber(user_id: int, username: str | None = None) -> bool:
         logger.error(f"❌ Ошибка добавления в БД: {e}")
         return False
 
+
+def export_subscribers_csv() -> str:
+    """Вернуть подписчиков в виде CSV-строки."""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT user_id, username, joined_at, status FROM subscribers")
+    rows = cur.fetchall()
+    conn.close()
+
+    buf = StringIO()
+    buf.write("user_id,username,joined_at,status\n")
+    for r in rows:
+        buf.write(f"{r[0]},{r[1]},{r[2]},{r[3]}\n")
+    buf.seek(0)
+    return buf.getvalue()
+
 # ================== ОБРАБОТЧИКИ ==================
 async def handle_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отслеживание новых подписчиков."""
@@ -91,7 +109,8 @@ async def handle_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
             else None
         )
 
-        if new_status == "member" and old_status in ["left", "restricted", None]:
+        # интересует только реальный переход "был не в канале" -> "стал member"
+        if new_status == "member" and old_status in ["left", "kicked", "restricted", None]:
             user_id = member_update.new_chat_member.user.id
             username = member_update.new_chat_member.user.username
             first_name = member_update.new_chat_member.user.first_name
@@ -119,7 +138,7 @@ async def handle_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     chat_id=user_id,
                     text=(
                         "🎉 <b>Добро пожаловать!</b>\n\n"
-                        "Спасибо что подписались на <b>@senseandart</b>!\n\n"
+                        "Спасибо, что подписались на <b>@senseandart</b>!\n\n"
                         "👇 Нажмите кнопку и получите <b>промокод на скидку</b>:"
                     ),
                     reply_markup=reply_markup,
@@ -145,11 +164,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             member = await context.bot.get_chat_member(
                 chat_id=CHANNEL_ID, user_id=user_id
             )
-            is_member = member.status in ["member", "administrator", "creator"]
-        except Exception:
+            status = member.status
+            is_member = status in ["member", "administrator", "creator"]
+            logger.info(f"Статус пользователя в канале: {status}")
+        except Exception as e:
+            logger.warning(f"Не удалось получить статус подписки: {e}")
             is_member = False
 
         if is_member:
+            # Уже подписан -> сразу даём промокод
             keyboard = [
                 [
                     InlineKeyboardButton(
@@ -161,12 +184,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await update.message.reply_text(
-                "🎉 <b>Спасибо что подписались на @senseandart!</b>\n\n"
-                "👇 Нажмите кнопку ниже:",
+                "🎉 <b>Спасибо, что вы уже подписаны на @senseandart!</b>\n\n"
+                "👇 Заберите ваш промокод по кнопке ниже:",
                 reply_markup=reply_markup,
                 parse_mode="HTML",
             )
         else:
+            # Не подписан — просим подписаться
             keyboard = [
                 [
                     InlineKeyboardButton(
@@ -190,6 +214,24 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ Ошибка /start: {e}")
 
 
+async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отправить CSV с подписчиками."""
+    try:
+        csv_text = export_subscribers_csv()
+        if not csv_text.strip() or csv_text.strip() == "user_id,username,joined_at,status":
+            await update.message.reply_text("Пока нет ни одного подписчика.")
+            return
+
+        await update.message.reply_document(
+            document=csv_text.encode("utf-8"),
+            filename="subscribers.csv",
+            caption="Подписчики в CSV",
+        )
+    except Exception as e:
+        logger.error(f"❌ Ошибка экспорта: {e}")
+        await update.message.reply_text("Не удалось выгрузить подписчиков.")
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ошибок."""
     logger.error(f"❌ Ошибка: {context.error}")
@@ -205,8 +247,9 @@ def main():
     logger.info("📝 Добавляем обработчики...")
     application.add_handler(
         ChatMemberHandler(handle_chat_member, ChatMemberHandler.CHAT_MEMBER)
-        )
+    )
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("export", export_command))
     application.add_error_handler(error_handler)
 
     logger.info("✅ Обработчики добавлены")
