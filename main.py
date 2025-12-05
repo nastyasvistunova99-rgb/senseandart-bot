@@ -11,6 +11,7 @@ import sqlite3
 from io import StringIO
 from pathlib import Path
 from datetime import datetime
+from zoneinfo import ZoneInfo  # часовой пояс
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, ContextTypes, ChatMemberHandler, CommandHandler
@@ -28,11 +29,13 @@ CHANNEL_USERNAME = "@senseandart"        # username канала
 PROMO_POST_ID = 42
 
 DB_PATH = Path("subscribers.db")
+TIMEZONE = ZoneInfo("Europe/Moscow")    # часовой пояс для времени в БД
 
 logger.info("=" * 50)
 logger.info(f"📌 BOT_TOKEN: {BOT_TOKEN[:20]}...")
 logger.info(f"📌 CHANNEL_USERNAME: {CHANNEL_USERNAME}")
 logger.info(f"📌 DB_PATH: {DB_PATH}")
+logger.info(f"📌 TIMEZONE: {TIMEZONE}")
 logger.info("=" * 50)
 
 # ================== БАЗА ДАННЫХ ==================
@@ -62,7 +65,8 @@ def init_db() -> None:
 def log_subscriber(user_id: int, username: str | None = None) -> bool:
     """Добавить подписчика в локальную БД SQLite."""
     try:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # время в выбранном часовом поясе
+        timestamp = datetime.now(TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
         username_str = f"@{username}" if username else f"User_{user_id}"
 
         conn = sqlite3.connect(DB_PATH)
@@ -75,7 +79,7 @@ def log_subscriber(user_id: int, username: str | None = None) -> bool:
         conn.commit()
         conn.close()
 
-        logger.info(f"✅ Добавлен в БД: {user_id} ({username_str})")
+        logger.info(f"✅ Добавлен в БД: {user_id} ({username_str}) в {timestamp}")
         return True
     except Exception as e:
         logger.error(f"❌ Ошибка добавления в БД: {e}")
