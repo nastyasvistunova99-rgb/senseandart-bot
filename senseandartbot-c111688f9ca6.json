@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "senseandartbot",
+  "private_key_id": "c111688f9ca6812be89fdd216d5ef55dd9dfc0ab",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDmurgYAQt4wRMw\nh7h/wiUfk+IWrRyUmhua3TXp+n7HIJUIpkniLHcO8VlF9IYHXPekL5wTrd54vCBH\nKidHQh5N7/w9vSsKbKYSsVfkJSPJ6inNyqGKPyBPdcGWdDpOrUD+0ysZ973XC2OJ\nkXyt0uLTcma7HbcdWPN4any8kEM1vDNAbQwkKX3twAkvYx5wBacx2UH7X1QP7h4d\n7rFrsp1o/PS2OQ9dYNZOSSOesU2T8ZNaBgSCF43R+bkRBH3Hsjf9xHLlj1VcmqY7\nspeQczC6faYnkaGR39e425Rudl6iEKI5HA7w30GZW6Ue209uu7refokblWVr1IGH\n+AbuTS2ZAgMBAAECggEAEIv7f90zUWmnUqepF6B4wRb989peXlne+PA8WZdZWDaB\n+ajTS6EcuLmeSWIL6qNEL0Yqz0580fPL7M6dGoMnYTeAw3y5hXndPyHwx6/SLTzZ\n2qRZiWyViJ1NUNjtBY9vRdcnFCmsN6vda5Q/eMfS9I8Txv+OjlA+xbf9UhiWeVfv\nBDggeyMcgZGXvjX2oHuTWNKAjNh6zWCRlu1Z/LvLlxWXOYyGBFSELH1ud4AGP8q0\nmcpAECFb/wFQs3BZeuC0nD4YK+mlUVbqnfxSwWIgOWetGXwNGMYlT/i2cyhEfF8K\nbvU1s6NcR/5UNp8o2W0z9KzX2TYU5ljLSQOZ0BBw8QKBgQD7I+CuUOfxJHCo2SLf\nfEom1LNh5rTj7wV3bupYZ/HNczq7QrZEZl0QS1XfDTLi+a+UqrsZdM1Fd0p9TXfk\nKbYIYa6Er8sjTtH49HY61QUnUXXA/aD4dLOYijg1vJxYhJUze/EjoDJIPmpQJGiW\ndqRHxk3WX+8cAwEr4yNPMS5xmwKBgQDrMbqEbb/vcgv7eQSA1YvL8aLb+gd9GYkP\nucAalvASsKD7Z4qo7ilwHXF5BlsGm/LixSR4wdQwXlEg7Kt85mrknCf9yZpMCTIh\nIyBvKIku6O1lbWr22XSvRWeKfoDu/GQvcnT1uhFq5uR3WbFH3IckjuMbau6BYRuU\nSukLM7za2wKBgQCD0Hr3Q2PZ/8RZ+04Aex34b5+PfSXolOYLn93EdRpHOXnUG9nK\n4Odry/7QSf8xftgXcd0uKU4sbcZdKjIJQZNXpt2Qqyw15gLzZmw/yNshnfHuT7ET\ndz1kjPefzNVK6JvfH+ibSFPb81adpd53SuJDAeSM5mF8FF+jB17bC/dSjQKBgB7g\nnHgeYIBzHJebP7gaUQwpYRQ4Mxt9ar0hydKz1jjd74SSB2Y+Pjp14xvcdb7cYnrb\nHvqrl8vx1fzYlXsEVSxGRAnRmew5mNc44V02mSwLcH9MaiqWSfdoyTspeIvnns+L\n20cXconyXjQ9FkU08pkeGTrUQxPBR/mkDAxocnbZAoGBANXIpWHo7D0yJA+ZgXcn\nDTADvthL0Ke85Nh7Rgcoh12aKUGoZXDi1+BjLOfWofNnZqBzRLhD/dMzGxBTfAFT\nk85/dZmJD84IfUd6h1P6zZSUEuxXKUDoppJ/g3MR/Sbr03csYUQBdS4+FGT0UCkn\nhzNJBr4Mxcd7JFSJjPU8cNEp\n-----END PRIVATE KEY-----\n",
+  "client_email": "senseandart-bot@senseandartbot.iam.gserviceaccount.com",
+  "client_id": "106872515519274857245",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/senseandart-bot%40senseandartbot.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
