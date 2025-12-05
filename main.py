@@ -24,14 +24,14 @@ logger = logging.getLogger(__name__)
 
 # ================== ПАРАМЕТРЫ ==================
 BOT_TOKEN = "7904726862:AAFG3CurCeRels3tXl_agIYYzhn6vBNlk0c"
-CHANNEL_ID = -1001764760145
+CHANNEL_USERNAME = "@senseandart"        # username канала
 PROMO_POST_ID = 42
 
 DB_PATH = Path("subscribers.db")
 
 logger.info("=" * 50)
 logger.info(f"📌 BOT_TOKEN: {BOT_TOKEN[:20]}...")
-logger.info(f"📌 CHANNEL_ID: {CHANNEL_ID}")
+logger.info(f"📌 CHANNEL_USERNAME: {CHANNEL_USERNAME}")
 logger.info(f"📌 DB_PATH: {DB_PATH}")
 logger.info("=" * 50)
 
@@ -109,7 +109,7 @@ async def handle_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
             else None
         )
 
-        # интересует только реальный переход "был не в канале" -> "стал member"
+        # интересует только переход "не был" -> "стал member"
         if new_status == "member" and old_status in ["left", "kicked", "restricted", None]:
             user_id = member_update.new_chat_member.user.id
             username = member_update.new_chat_member.user.username
@@ -119,10 +119,9 @@ async def handle_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 f"✅ НОВЫЙ ПОДПИСЧИК: {user_id} (@{username}) - {first_name}"
             )
 
-            # Логируем в локальную БД
             log_subscriber(user_id, username)
 
-            # Отправляем приватное сообщение
+            # Отправляем приватное сообщение с промокодом
             try:
                 keyboard = [
                     [
@@ -159,15 +158,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = update.effective_user.username
         logger.info(f"📝 /start от {user_id} (@{username})")
 
-        # Проверяем подписку через get_chat_member
+        # Проверяем подписку по username канала
         try:
             member = await context.bot.get_chat_member(
-                chat_id=CHANNEL_ID, user_id=user_id
+                chat_id=CHANNEL_USERNAME, user_id=user_id
             )
             status = member.status
             logger.info(f"get_chat_member для {user_id}: {member!r}")
-            is_member = status in ["member", "administrator", "creator"]
-            logger.info(f"Статус пользователя в канале: {status}")
+            # считаем подписанным всех, кто НЕ left и НЕ kicked
+            is_member = status not in ["left", "kicked"]
+            logger.info(f"Статус пользователя в канале: {status}, is_member={is_member}")
         except Exception as e:
             logger.warning(f"Не удалось получить статус подписки: {e}")
             is_member = False
